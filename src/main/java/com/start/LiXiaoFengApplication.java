@@ -1,7 +1,6 @@
 package com.start;
 
-import com.config.AppConfig;
-import com.config.BeanDefinition;
+import com.config.*;
 import com.service.UserService;
 import com.service.impl.UserServiceImpl;
 import com.spring.Component;
@@ -12,7 +11,10 @@ import com.spring.Scope;
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +24,7 @@ public class LiXiaoFengApplication {
 
     private ConcurrentHashMap<String,Object> singleTonContainer = new ConcurrentHashMap<String,Object>();//单例池
     private ConcurrentHashMap<String,BeanDefinition> beanDefinitionMaps = new ConcurrentHashMap<String,BeanDefinition>();
+    private ConcurrentHashMap<String,BeanPostProcessor> beanPostMaps = new ConcurrentHashMap<String,BeanPostProcessor>();
 
     /**
      * 初始化容器
@@ -41,7 +44,7 @@ public class LiXiaoFengApplication {
         for (Map.Entry<String, BeanDefinition> beanDefinition : beanDefinitionMaps.entrySet()) {
             String beanName = beanDefinition.getKey();
             BeanDefinition bean = beanDefinition.getValue();
-            dependencyInjection(bean,singleTonContainer.get(beanName));
+            dependencyInjection(beanName,bean,singleTonContainer.get(beanName));
         }
     }
 
@@ -84,9 +87,21 @@ public class LiXiaoFengApplication {
                                 } else {
                                     beanDefinition.setScope("singleton");
                                 }
+                                //判断该类是否实现BeanPostProcessor
+                                boolean assignableFrom = BeanPostProcessor.class.isAssignableFrom(clazz);
+                                if(assignableFrom) {
+                                    BeanPostProcessor beanPostProcessor = (BeanPostProcessor)clazz.getDeclaredConstructor().newInstance();
+                                    beanPostMaps.put(beanName,beanPostProcessor);
+                                }
                                 beanDefinitionMaps.put(beanName,beanDefinition);
                             }
-                        } catch (ClassNotFoundException e) {
+                        } catch (ClassNotFoundException | NoSuchMethodException e) {
+                            e.printStackTrace();
+                        } catch (IllegalAccessException e) {
+                            e.printStackTrace();
+                        } catch (InstantiationException e) {
+                            e.printStackTrace();
+                        } catch (InvocationTargetException e) {
                             e.printStackTrace();
                         }
                     }
@@ -113,7 +128,7 @@ public class LiXiaoFengApplication {
         return null;
     }
 
-    public void dependencyInjection(BeanDefinition beanDefinition,Object instance){
+    public void dependencyInjection(String beanName, BeanDefinition beanDefinition,Object instance){
         Class aClass = beanDefinition.getaClass();
         //依赖注入
         for(Field field :aClass.getDeclaredFields()) {
@@ -129,6 +144,38 @@ public class LiXiaoFengApplication {
                 }
             }
         }
+
+        //Aware回调
+        if (instance instanceof BeanNameAware) {
+           ((BeanNameAware) instance).setBeanName(beanName);
+        }
+
+        //初始化之前执行BeanPostProcessor的postProcessBeforeInitialization方法 前置处理器
+        if (beanPostMaps.containsKey(beanName)) {
+            BeanPostProcessor beanPostProcessor = beanPostMaps.get(beanName);
+            instance = beanPostProcessor.postProcessBeforeInitialization(instance, beanName);
+        }
+        /*for(BeanPostProcessor beanPostProcessor : beanPostProcessorList) {
+            instance = beanPostProcessor.postProcessBeforeInitialization(instance, beanName);
+        }*/
+
+        //初始化
+        if (instance instanceof InitializingBean) {
+            try {
+                ((InitializingBean) instance).afterPropertiesSet();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        //初始化之后执行bean的后置处理器
+        if (beanPostMaps.containsKey(beanName)) {
+            BeanPostProcessor beanPostProcessor = beanPostMaps.get(beanName);
+            instance = beanPostProcessor.postProcessAfterInitialization(instance, beanName);
+        }
+        /*for(BeanPostProcessor beanPostProcessor : beanPostProcessorList) {
+            instance = beanPostProcessor.postProcessAfterInitialization(instance, beanName);
+        }*/
     }
 
     /**
@@ -154,7 +201,8 @@ public class LiXiaoFengApplication {
 
         LiXiaoFengApplication application = new LiXiaoFengApplication(AppConfig.class);
         UserServiceImpl service = (UserServiceImpl) application.getBean("userServiceImpl");
-        service.test();
+        System.out.println("msg:"+service.getMsg());
+        System.out.println(service.test());
         //service.studentServiceImpl("今天天气真好！");
     }
 

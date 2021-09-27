@@ -8,6 +8,7 @@ import com.spring.Scope;
 public class WomServiceImpl implements UserService {
     @Override
     public String hello(String msg) {
-        return null;
+        System.out.println(msg);
+        return "你好userServiceImpl";
     }
 }

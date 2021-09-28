@@ -6,6 +6,11 @@ import com.config.InitializingBean;
 import com.service.UserService;
 import com.spring.Component;
 import com.spring.Resource;
+import com.start.LiXiaoFengApplication;
+
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 
 @Component("userServiceImpl")
 public class UserServiceImpl implements UserService, BeanNameAware , InitializingBean , BeanPostProcessor {
@@ -61,8 +66,13 @@ public class UserServiceImpl implements UserService, BeanNameAware , Initializin
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
-        ((UserServiceImpl)bean).setMsg("初始化之后的设置");
+
+        Object newProxyInstance = Proxy.newProxyInstance(UserServiceImpl.class.getClassLoader(), bean.getClass().getInterfaces(),(proxy, method, args) ->{
+            System.out.println("生成代理对象");
+            return method.invoke(bean,args);
+        });
+
         System.out.println("初始化之后执行");
-        return bean;
+        return newProxyInstance;
     }
 }

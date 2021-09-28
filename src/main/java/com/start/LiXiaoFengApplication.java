@@ -41,6 +41,7 @@ public class LiXiaoFengApplication {
             Object bean1 = createBean(bean);
             singleTonContainer.put(beanName, bean1);
         }
+        //依赖注入
         for (Map.Entry<String, BeanDefinition> beanDefinition : beanDefinitionMaps.entrySet()) {
             String beanName = beanDefinition.getKey();
             BeanDefinition bean = beanDefinition.getValue();
